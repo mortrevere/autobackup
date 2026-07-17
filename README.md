@@ -1,68 +1,229 @@
 # autobackup
 
-`autobackup` is a minimal, fully functional v0.1 backup CLI. It is a
-portable `rsync` over SSH runner for machines that need predictable incremental
-copies to a remote host without adopting a full archive/repository backup
-system.
+`autobackup` copies local folders to a remote machine over SSH using `rsync`.
+It is meant for straightforward incremental backups to a normal directory tree:
+no proprietary archive format, no repository database, and no restore tool
+required.
 
-The initial design target is a Windows/Linux workstation backing up large,
-messy user trees to an SSH server:
+It is a good fit for workstations with large, messy folders: documents,
+projects, downloads, media libraries, sample packs, `.git` checkouts, paths
+with spaces, and Windows drive paths.
 
-- millions of small audio/sample-pack files in nested DAW folders
-- `.git` checkouts and other VCS-heavy trees
-- large download folders containing multi-GB files
-- paths with spaces and Windows drive paths
+## What It Does
 
-The destination is a normal remote directory tree. `autobackup` does not create
-a proprietary backup repository.
-
-## Current Features
-
-- JSON configuration with multiple source locations.
-- Remote destination over SSH using `rsync`.
-- Linux and Windows amd64 builds.
-- Optional bundled `rsync` and `ssh` lookup beside the executable, with `PATH`
-  fallback.
-- Windows source path conversion for MSYS2/Cygwin/native rsync builds.
-- `--dry-run` support.
-- Quiet mode for heartbeat-only progress plus final summaries.
-- Per-location `--delete`.
-- Include pattern support.
-- Prefix and substring excludes.
-- Concurrent rsync task execution through `jobs`.
-- Adaptive automatic task planning:
-  - top-level directories are split into parallel rsync tasks when safe
-  - source-root files get a dedicated root-files task
-  - VCS-heavy or very deep top-level folders are isolated into recursive rsync
-    tasks while siblings can still be split
-- Docker end-to-end test stack using a real SSH server and rsync.
+- Backs up one or more local locations to an SSH host.
+- Stores files under a normal remote directory.
+- Uses `rsync` for incremental copies.
+- Can run a dry run before changing the destination.
+- Can skip paths by prefix or substring.
+- Can include only files matching a pattern.
+- Can either append/update files or mirror deletions with per-location
+  `delete`.
+- Runs multiple rsync jobs when a location can be split safely.
+- Supports Linux and Windows amd64 builds.
 
 ## Requirements
 
-Local machine:
+On the machine running `autobackup`:
 
-- Go, for building from source
-- `rsync` and `ssh`, either on `PATH` or bundled beside the executable
+- `rsync`
+- `ssh`
+- a JSON config file
 
-Remote machine:
+On the destination machine:
 
 - SSH server
-- `rsync` available for the remote user
-- a writable destination base directory
+- `rsync`
+- a writable backup directory for the SSH user
 
-Windows portability is a project requirement. Windows builds are expected to
-work with rsync distributions such as MSYS2/Cygwin-style packages when the
-configured or bundled tool paths point at compatible binaries.
+`autobackup` looks for `rsync` and `ssh` beside the executable first, then on
+`PATH`. You can also set exact tool paths in the config.
 
 ## Windows Setup
 
 Install [MSYS2](https://www.msys2.org/docs/installer/), then install the tools:
-`pacman -S rsync openssh`.
-Default paths are usually `C:\msys64\usr\bin\rsync.exe` and
-`C:\msys64\usr\bin\ssh.exe`.
-Other Windows ports of `rsync` and `ssh` should also work.
 
-## Build
+```sh
+pacman -S rsync openssh
+```
+
+The common MSYS2 paths are:
+
+- `C:\msys64\usr\bin\rsync.exe`
+- `C:\msys64\usr\bin\ssh.exe`
+
+If `destination.identity-file` is set, `autobackup` also does a best-effort
+Windows key-permission repair before connecting, so OpenSSH is more likely to
+accept private keys that were previously readable by the Windows Users group.
+
+## Create A Config
+
+The easiest starting point is:
+
+```sh
+autobackup -init
+```
+
+`-init` first asks whether you want to configure interactively.
+
+If you answer yes, it asks for:
+
+- destination host
+- destination username
+- destination base path
+- SSH key location
+- first source path
+- remote destination folder for that source
+- include pattern
+- one optional exclusion
+- whether the destination should append/update only or sync deletions too
+
+It writes a valid JSON config and prints the absolute path.
+
+If you answer no, it immediately writes a valid default config and prints its
+absolute path. Edit that file before running a real backup.
+
+You can choose where the file is written:
+
+```sh
+autobackup -config /path/to/autobackup.config.json -init
+```
+
+`-init` refuses to overwrite an existing config.
+
+## Run A Backup
+
+Start with a dry run:
+
+```sh
+autobackup -config /path/to/autobackup.config.json -dry-run
+```
+
+Run the backup:
+
+```sh
+autobackup -config /path/to/autobackup.config.json
+```
+
+Useful flags:
+
+```sh
+autobackup -config backup.json -jobs 8
+autobackup -config backup.json -quiet
+autobackup -version
+autobackup -help
+```
+
+If `-config` is omitted, `AUTO_BACKUP_CONFIG` is used when set. Otherwise
+`autobackup` looks for `autobackup.config.json` in the current directory first,
+then beside the executable.
+
+## Config Example
+
+Configuration files are JSON:
+
+```json
+{
+  "destination": {
+    "host": "backup.example.com",
+    "username": "backup",
+    "base-path": "/srv/backups/workstation",
+    "identity-file": "/home/me/.ssh/id_ed25519"
+  },
+  "locations": [
+    {
+      "source": "/home/me/Documents",
+      "destination": "documents",
+      "pattern": "**",
+      "verification": "audit",
+      "exclude-prefixes": [
+        "Downloads"
+      ],
+      "exclude-strings": [
+        ".venv",
+        ".git"
+      ],
+      "delete": false
+    }
+  ],
+  "tools": {
+    "rsync": "",
+    "ssh": ""
+  },
+  "windows-path-style": "auto",
+  "jobs": 16,
+  "quiet": false
+}
+```
+
+Another example is available in
+[autobackup.config.example.json](autobackup.config.example.json).
+
+## Config Keys
+
+Required keys:
+
+- `destination.host`: remote SSH host.
+- `destination.username`: remote SSH username.
+- `destination.base-path`: remote root under which backups are created.
+- `locations[].source`: local source path to back up.
+- `locations[].destination`: remote folder under `destination.base-path`.
+
+Optional keys:
+
+- `destination.identity-file`: SSH private key path. When set, SSH runs in
+  batch mode and does not prompt for passwords.
+- `tools.rsync`: exact local `rsync` path. Empty uses bundled tools, then
+  `PATH`.
+- `tools.ssh`: exact local `ssh` path. Empty uses bundled tools, then `PATH`.
+- `jobs`: maximum concurrent rsync jobs. Default: `16`.
+- `quiet`: only print heartbeats, final summaries, and errors.
+- `windows-path-style`: `auto`, `native`, `msys`, or `cygwin`. Default:
+  `auto`.
+- `locations[].parallel-rsync`: optional planning override. Omit for automatic
+  planning, use `false` for one root rsync task, or `true` for directory-level
+  tasks.
+- `locations[].pattern`: include pattern. Default: `**`.
+- `locations[].verification`: `changed`, `audit`, or `full`. Default: `audit`.
+- `locations[].exclude-prefixes`: source-relative prefixes to skip entirely.
+- `locations[].exclude-strings`: source-relative path substrings to skip.
+- `locations[].delete`: pass `--delete` to rsync for that location.
+
+## Delete Behavior
+
+By default, `delete` is `false`. That means `autobackup` copies new and changed
+files but does not remove old files from the destination.
+
+Set `delete` to `true` for a location when the remote folder should mirror the
+source and remove files that were deleted locally.
+
+## Verification
+
+`verification` is configured per location:
+
+- `changed`: normal rsync transfer behavior, with no post-transfer checksum
+  pass.
+- `audit`: default. After rsync completes, check a bounded daily sample of
+  regular files with an rsync checksum dry run.
+- `full`: after rsync completes, check the full task with an rsync checksum dry
+  run.
+
+Normal transfers use rsync's quick-check behavior for speed. `audit` and
+`full` add checksum dry runs after transfer without keeping a local manifest or
+cache.
+
+## Performance
+
+`autobackup` automatically plans rsync work for each location. Where safe, it
+splits top-level folders into parallel jobs. Source-root files get their own
+task. Very deep or VCS-heavy top-level folders are kept recursive so other
+folders can still run in parallel.
+
+Use `jobs` in the config or `-jobs` on the command line to control concurrency.
+
+## Build From Source
+
+Building from source requires Go.
 
 Build both supported targets:
 
@@ -82,10 +243,7 @@ Build artifacts are written to:
 - `dist/linux-amd64/autobackup`
 - `dist/windows-amd64/autobackup.exe`
 
-The `dist/` directory is generated output and is ignored by Git.
-
-At runtime, the executable checks for bundled tools before falling back to
-`PATH`:
+The executable checks for bundled tools before falling back to `PATH`:
 
 - `tools/linux-amd64/rsync`
 - `tools/linux-amd64/ssh`
@@ -100,148 +258,12 @@ Run unit tests:
 go test ./...
 ```
 
-Run the Docker end-to-end stack:
+Run the Docker end-to-end test:
 
 ```sh
 scripts/e2e-docker.sh
 ```
 
 The Docker test builds the Linux binary, starts an SSH server with `rsync`, runs
-`autobackup` from another container, and verifies the copied files and excludes.
+`autobackup` from another container, and verifies copied files and excludes.
 More detail is in [e2e/README.md](e2e/README.md).
-
-## Run
-
-```sh
-autobackup --config backup.json
-autobackup --config backup.json --dry-run
-autobackup --config backup.json --jobs 16
-autobackup --config backup.json --quiet
-autobackup --version
-```
-
-If `--config` is omitted, `AUTO_BACKUP_CONFIG` is used when set. Otherwise the
-executable looks for `autobackup.config.json` in the current directory first,
-then beside itself.
-
-## Config
-
-Configuration files use JSON. A starting point is available in
-[autobackup.config.example.json](autobackup.config.example.json). The binary is
-portable and can use any config path. This repository ignores `local-config/`
-for developer-machine configs.
-
-```json
-{
-  "destination": {
-    "host": "10.0.0.100",
-    "username": "pi",
-    "base-path": "/tmp/disk/backup",
-    "identity-file": "/path/to/id_rsa"
-  },
-  "tools": {
-    "rsync": "/usr/bin/rsync",
-    "ssh": "/usr/bin/ssh"
-  },
-  "jobs": 16,
-  "quiet": false,
-  "windows-path-style": "auto",
-  "locations": [
-    {
-      "source": "C:\\home",
-      "destination": "home",
-      "parallel-rsync": false,
-      "pattern": "**",
-      "verification": "audit",
-      "exclude-prefixes": ["Downloads"],
-      "exclude-strings": [".venv"],
-      "delete": false
-    }
-  ]
-}
-```
-
-Required fields:
-
-- `destination.host`
-- `destination.username`
-- `destination.base-path`
-- at least one `locations` entry
-- each location's `source` and `destination`
-
-Important fields:
-
-- `destination.base-path` is the remote root under which all location
-  destinations are created.
-- `destination.identity-file` enables SSH batch mode and disables password
-  prompts.
-- `tools.rsync` and `tools.ssh` override tool discovery.
-- `jobs` controls concurrent rsync tasks and defaults to `16`.
-- `quiet` hides normal per-task logs and only prints periodic heartbeats,
-  final summaries, and errors.
-- `windows-path-style` can be `auto`, `native`, `msys`, or `cygwin`.
-- `delete` defaults to `false`; set it per location to pass `--delete`.
-- `pattern` defaults to `**`; use patterns such as `*.pdf` to include only
-  matching files while keeping directories.
-- `verification` defaults to `audit`; use `changed`, `audit`, or `full`.
-- `exclude-prefixes` excludes source-relative path roots.
-- `exclude-strings` excludes paths containing a source-relative substring.
-- `parallel-rsync` is optional:
-  - omitted: use the adaptive automatic planning heuristic
-  - `false`: use one root rsync task
-  - `true`: create directory-level rsync tasks
-
-On Windows, `autobackup` runs a best-effort `icacls` repair before connecting
-when `destination.identity-file` is set, so OpenSSH is more likely to accept
-private keys that were previously readable by the Windows Users group.
-
-## Verification And Speed
-
-`verification` is configured per location:
-
-- `changed`: keep the normal rsync transfer behavior, with no post-transfer
-  checksum pass.
-- `audit`: default. After rsync completes, select a bounded daily sample of
-  regular files from the task and run an rsync checksum dry-run for those paths.
-- `full`: after rsync completes, run an rsync checksum dry-run for the full
-  task.
-
-The normal transfer path uses rsync's quick-check behavior for speed. Audit and
-full verification add checksum dry-runs after transfer without keeping a local
-manifest or cache.
-
-The automatic planner splits top-level folders where it can. Source-root files
-get a root-files task, while deep or VCS-heavy top-level folders are kept in
-recursive rsync tasks so the rest of the location can still run in parallel.
-
-## Code Structure
-
-- [cmd/autobackup/main.go](cmd/autobackup/main.go): CLI flags, config loading,
-  plan creation, signal handling, exit codes.
-- [internal/autobackup/config.go](internal/autobackup/config.go): JSON config
-  schema, defaults, validation, config path resolution.
-- [internal/autobackup/plan.go](internal/autobackup/plan.go): tool resolution,
-  folder discovery, parallelization heuristic, rsync/SSH argument construction.
-- [internal/autobackup/run.go](internal/autobackup/run.go): worker pool,
-  command execution, rsync output parsing, summary reporting.
-- [internal/autobackup/paths.go](internal/autobackup/paths.go): platform tags,
-  bundled tool lookup, Windows path conversion, remote path joining.
-- `internal/autobackup/identity_*.go`: platform-specific SSH identity-file
-  preparation.
-- `internal/autobackup/process_*.go`: platform-specific process termination.
-- `internal/autobackup/*_test.go`: unit tests for config, planning, paths, and
-  runner behavior.
-- `e2e/`: Docker-based end-to-end test fixture and SSH server.
-- `scripts/`: build and test helper scripts.
-
-## Docker E2E
-
-Run the Docker-based end-to-end stack from the repository root:
-
-```sh
-scripts/e2e-docker.sh
-```
-
-It builds the Linux binary, starts an SSH server with `rsync`, runs
-`autobackup` from a separate container with fixture files, and verifies the
-files landed in the remote backup volume.
