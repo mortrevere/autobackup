@@ -1,0 +1,22 @@
+services:
+  ssh-server:
+    build:
+      context: .
+      dockerfile: e2e/ssh-server/Dockerfile
+    volumes:
+      - e2e-backup:/tmp/disk/backup root
+
+  autobackup:
+    build:
+      context: .
+      dockerfile: e2e/runner/Dockerfile
+    environment:
+      NO_COLOR: "1"
+    depends_on:
+      ssh-server:
+        condition: service_healthy
+    volumes:
+      - ./e2e/source:/data/source:ro
+
+volumes:
+  e2e-backup:

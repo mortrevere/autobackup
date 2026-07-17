@@ -1,0 +1,18 @@
+{
+  "destination": {
+    "host": "ssh-server",
+    "username": "backup",
+    "base-path": "/tmp/disk/backup root",
+    "identity-file": "/app/ssh/id_ed25519"
+  },
+  "jobs": 1,
+  "locations": [
+    {
+      "source": "/data/source",
+      "destination": "e2e host",
+      "exclude-prefixes": ["excluded folder"],
+      "exclude-strings": [".venv"],
+      "delete": true
+    }
+  ]
+}
