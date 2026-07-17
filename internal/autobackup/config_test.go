@@ -67,7 +67,7 @@ func TestResolveConfigPathFallsBackToExecutableDirectory(t *testing.T) {
 	}
 }
 
-func TestLoadConfigDefaultsAndDashedKeys(t *testing.T) {
+func TestLoadConfigDefaultsAndFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	err := os.WriteFile(path, []byte(`{
 		"destination": {"host": "host", "username": "pi", "base-path": "/backup", "identity-file": "/keys/id"},

@@ -126,8 +126,7 @@ then beside itself.
 
 ## Config
 
-Configuration files use JSON with dashed field names. Unknown fields are
-ignored by the JSON decoder. A sanitized starting point is available in
+Configuration files use JSON. A starting point is available in
 [autobackup.config.example.json](autobackup.config.example.json). The binary is
 portable and can use any config path. This repository ignores `local-config/`
 for developer-machine configs.

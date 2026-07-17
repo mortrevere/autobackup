@@ -88,8 +88,8 @@ func configTemplate() string {
 
 Configuration template
 
-Use dashed field names. JSON does not support comments, so this template uses
-"_comment" fields that can be deleted after editing.
+JSON does not support comments, so this template uses "_comment" fields that
+can be deleted after editing.
 
 {
   "_comment": "Top-level autobackup configuration.",
