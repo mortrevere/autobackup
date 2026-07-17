@@ -348,7 +348,7 @@ func BuildTask(dest Destination, loc Location, folder string, tools Tools, opts 
 	remoteRel := JoinRemote(loc.Destination, filepath.ToSlash(baseDir))
 	remoteFolder := JoinRemote(dest.BasePath, remoteRel)
 	remoteTarget := fmt.Sprintf("%s@%s:%s", dest.Username, dest.Host, remoteFolder)
-	sshArgs := SSHArgs(dest)
+	sshArgs := SSHArgs(dest, opts.GOOS)
 
 	rsyncArgs := []string{
 		"-avh",
@@ -381,7 +381,7 @@ func BuildTask(dest Destination, loc Location, folder string, tools Tools, opts 
 	}
 	rsyncArgs = append(rsyncArgs, "-e", shellJoin(append([]string{tools.SSH}, sshArgs...)), source, remoteTarget)
 
-	mkdirArgs := append(SSHArgs(dest), fmt.Sprintf("%s@%s", dest.Username, dest.Host), "mkdir", "-p", shellQuote(remoteFolder))
+	mkdirArgs := append(SSHArgs(dest, opts.GOOS), fmt.Sprintf("%s@%s", dest.Username, dest.Host), "mkdir", "-p", shellQuote(remoteFolder))
 	return Task{
 		LocationName: loc.Source,
 		SourceFolder: folder,
@@ -432,10 +432,17 @@ func normalizePathSubstring(substring string) string {
 	return strings.TrimSpace(strings.ReplaceAll(filepath.ToSlash(substring), "\\", "/"))
 }
 
-func SSHArgs(dest Destination) []string {
+func SSHArgs(dest Destination, goos string) []string {
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+	nullDevice := "/dev/null"
+	if goos == "windows" {
+		nullDevice = "NUL"
+	}
 	args := []string{
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-o", "GlobalKnownHostsFile=/dev/null",
+		"-o", "UserKnownHostsFile=" + nullDevice,
+		"-o", "GlobalKnownHostsFile=" + nullDevice,
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "LogLevel=ERROR",
 		"-o", "BatchMode=yes",

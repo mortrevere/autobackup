@@ -121,7 +121,7 @@ func (r Runner) runVerificationRsyncOnce(ctx context.Context, bin string, task T
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, waitAfterScanError(ctx, cmd, err)
 	}
 	if err := waitCommand(ctx, cmd); err != nil {
 		return nil, fmt.Errorf("%s verification rsync failed: %w", task.SourceFolder, err)

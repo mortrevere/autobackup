@@ -424,7 +424,7 @@ func TestDiscoverFoldersExplicitTrueBypassesHeuristic(t *testing.T) {
 }
 
 func TestSSHArgsWithIdentityFile(t *testing.T) {
-	got := SSHArgs(Destination{IdentityFile: "/keys/id"})
+	got := SSHArgs(Destination{IdentityFile: "/keys/id"}, "linux")
 	joined := strings.Join(got, "\x00")
 	for _, want := range []string{"BatchMode=yes", "IdentitiesOnly=yes", "LogLevel=ERROR", "GlobalKnownHostsFile=/dev/null", "-i", "/keys/id"} {
 		if !strings.Contains(joined, want) {
@@ -434,5 +434,17 @@ func TestSSHArgsWithIdentityFile(t *testing.T) {
 	wantTail := []string{"-i", "/keys/id"}
 	if !reflect.DeepEqual(got[len(got)-2:], wantTail) {
 		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestSSHArgsUsesWindowsNullDevice(t *testing.T) {
+	got := strings.Join(SSHArgs(Destination{}, "windows"), "\x00")
+	for _, want := range []string{"UserKnownHostsFile=NUL", "GlobalKnownHostsFile=NUL"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in %q", want, got)
+		}
+	}
+	if strings.Contains(got, "/dev/null") {
+		t.Fatalf("windows ssh args include Unix null device: %q", got)
 	}
 }

@@ -3,6 +3,7 @@ package autobackup
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -346,7 +347,7 @@ func (r Runner) runRsync(ctx context.Context, bin string, args []string, stdin i
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return changed, err
+		return changed, waitAfterScanError(ctx, cmd, err)
 	}
 	if err := waitCommand(ctx, cmd); err != nil {
 		return changed, err
@@ -385,6 +386,14 @@ func waitCommand(ctx context.Context, cmd *exec.Cmd) error {
 	}
 }
 
+func waitAfterScanError(ctx context.Context, cmd *exec.Cmd, scanErr error) error {
+	terminateCommand(cmd)
+	if err := waitCommand(ctx, cmd); err != nil {
+		return errors.Join(scanErr, err)
+	}
+	return scanErr
+}
+
 func watchCommandCancel(ctx context.Context, cmd *exec.Cmd) func() {
 	done := make(chan struct{})
 	go func() {
@@ -402,7 +411,7 @@ func watchCommandCancel(ctx context.Context, cmd *exec.Cmd) func() {
 func (r Runner) printDiskSummary(ctx context.Context, plan Plan) {
 	fmt.Fprintln(r.Stdout, Colorize(ColorWhite, "Remote disk usage"))
 	fmt.Fprintln(r.Stdout, Colorize(ColorWhite, "-----------------"))
-	base := SSHArgs(plan.Config.Destination)
+	base := SSHArgs(plan.Config.Destination, "")
 	target := fmt.Sprintf("%s@%s", plan.Config.Destination.Username, plan.Config.Destination.Host)
 	args := append([]string{}, base...)
 	args = append(args, target, "df -h "+shellQuote(plan.Config.Destination.BasePath))

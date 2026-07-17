@@ -1,8 +1,10 @@
 package autobackup
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -168,6 +170,36 @@ func TestRunRsyncQuietSuppressesNormalOutputButKeepsErrors(t *testing.T) {
 	}
 	if !strings.Contains(got, "ERROR ? : rsync warning: example") {
 		t.Fatalf("quiet output suppressed rsync error: %s", got)
+	}
+}
+
+func TestRunRsyncWaitsAfterScannerError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script fake commands are for Unix test hosts")
+	}
+	dir := t.TempDir()
+	rsyncPath := filepath.Join(dir, "rsync")
+	if err := os.WriteFile(rsyncPath, []byte("#!/usr/bin/env bash\nprintf '%1048577s\\n' x\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := (Runner{Stdout: ioDiscard{}}).runRsync(context.Background(), rsyncPath, nil, nil, "[test]:", false)
+	if !errors.Is(err, bufio.ErrTooLong) {
+		t.Fatalf("got error %v, want scanner too-long error", err)
+	}
+}
+
+func TestVerificationRsyncWaitsAfterScannerError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script fake commands are for Unix test hosts")
+	}
+	dir := t.TempDir()
+	rsyncPath := filepath.Join(dir, "rsync")
+	if err := os.WriteFile(rsyncPath, []byte("#!/usr/bin/env bash\nprintf '%1048577s\\n' x\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := (Runner{Stdout: ioDiscard{}}).runVerificationRsyncOnce(context.Background(), rsyncPath, Task{}, nil, "[test]:")
+	if !errors.Is(err, bufio.ErrTooLong) {
+		t.Fatalf("got error %v, want scanner too-long error", err)
 	}
 }
 
