@@ -1,0 +1,30 @@
+{
+  "jobs": 8,
+  "destination": {
+    "host": "backup.example.com",
+    "username": "backup",
+    "base-path": "/srv/backups/workstation",
+    "identity-file": "id_ed25519"
+  },
+  "tools": {
+    "rsync": "/usr/bin/rsync",
+    "ssh": "/usr/bin/ssh"
+  },
+  "quiet": false,
+  "windows-path-style": "auto",
+  "locations": [
+    {
+      "source": "Documents",
+      "destination": "documents",
+      "verification": "audit",
+      "exclude-prefixes": [
+        "Downloads"
+      ],
+      "exclude-strings": [
+        ".venv",
+        ".git"
+      ],
+      "delete": false
+    }
+  ]
+}

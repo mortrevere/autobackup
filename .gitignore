@@ -1,0 +1,13 @@
+dist/
+local-config/
+
+/autobackup.config.json
+/autobackup.linux.config.json
+
+e2e/ssh/id_ed25519
+e2e/ssh/id_ed25519.pub
+
+.cache/
+.pytest_cache/
+__pycache__/
+.DS_Store
