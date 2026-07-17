@@ -6,8 +6,7 @@ no proprietary archive format, no repository database, and no restore tool
 required.
 
 It is a good fit for workstations with large, messy folders: documents,
-projects, downloads, media libraries, sample packs, `.git` checkouts, paths
-with spaces, and Windows drive paths.
+projects, downloads, media libraries, DAW sample packs, `.git` trees, etc.
 
 ## What It Does
 
@@ -28,7 +27,7 @@ On the machine running `autobackup`:
 
 - `rsync`
 - `ssh`
-- a JSON config file
+- a JSON config file (which can be generated interactively)
 
 On the destination machine:
 
