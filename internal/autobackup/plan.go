@@ -38,7 +38,6 @@ type Task struct {
 type TaskKind string
 
 const (
-	TaskRecursive     TaskKind = ""
 	TaskRootFilesOnly TaskKind = "root-files"
 )
 
@@ -146,19 +145,6 @@ func DiscoverFolders(loc Location) ([]string, error) {
 	return folders, nil
 }
 
-func DiscoverFoldersWithMode(loc Location) ([]string, SplitMode, error) {
-	tasks, err := DiscoverTasks(loc)
-	if err != nil {
-		return nil, SplitExplicit, err
-	}
-	folders := make([]string, 0, len(tasks))
-	mode := aggregateSplitMode(tasks)
-	for _, task := range tasks {
-		folders = append(folders, task.Folder)
-	}
-	return folders, mode, nil
-}
-
 func DiscoverTasks(loc Location) ([]discoveredTask, error) {
 	pattern := loc.Pattern
 	if pattern == "" {
@@ -187,23 +173,6 @@ func DiscoverTasks(loc Location) ([]discoveredTask, error) {
 	}
 	folders = append(folders, loc.Source)
 	return discoveredRecursiveTasks(folders, SplitExplicit), nil
-}
-
-func aggregateSplitMode(tasks []discoveredTask) SplitMode {
-	mode := SplitExplicit
-	for _, task := range tasks {
-		if task.SplitMode == SplitExplicit {
-			continue
-		}
-		if mode == SplitExplicit {
-			mode = task.SplitMode
-			continue
-		}
-		if mode != task.SplitMode {
-			return SplitHeuristicSplit
-		}
-	}
-	return mode
 }
 
 func discoveredRecursiveTasks(folders []string, mode SplitMode) []discoveredTask {

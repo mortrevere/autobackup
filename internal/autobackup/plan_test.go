@@ -205,7 +205,7 @@ func TestDiscoverFoldersHonorsExcludes(t *testing.T) {
 	t.Fatalf("unexpected folders: %#v", got)
 }
 
-func TestDiscoverFoldersWithModeReportsHeuristicSplit(t *testing.T) {
+func TestDiscoverTasksReportsHeuristicSplit(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "source")
 	if err := os.MkdirAll(filepath.Join(source, "a"), 0o755); err != nil {
@@ -214,7 +214,7 @@ func TestDiscoverFoldersWithModeReportsHeuristicSplit(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(source, "b"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	_, mode, err := DiscoverFoldersWithMode(Location{
+	tasks, err := DiscoverTasks(Location{
 		Source:      source,
 		Destination: "dest",
 		Pattern:     "**",
@@ -222,12 +222,14 @@ func TestDiscoverFoldersWithModeReportsHeuristicSplit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mode != SplitHeuristicSplit {
-		t.Fatalf("mode got %q want %q", mode, SplitHeuristicSplit)
+	for _, task := range tasks {
+		if task.SplitMode != SplitHeuristicSplit {
+			t.Fatalf("task %#v mode got %q want %q", task, task.SplitMode, SplitHeuristicSplit)
+		}
 	}
 }
 
-func TestDiscoverFoldersWithModeReportsHeuristicRootFilesAsSplit(t *testing.T) {
+func TestDiscoverTasksReportsHeuristicRootFilesAsSplit(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "source")
 	if err := os.MkdirAll(filepath.Join(source, "a"), 0o755); err != nil {
@@ -236,7 +238,7 @@ func TestDiscoverFoldersWithModeReportsHeuristicRootFilesAsSplit(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(source, "root.txt"), []byte("root"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, mode, err := DiscoverFoldersWithMode(Location{
+	tasks, err := DiscoverTasks(Location{
 		Source:      source,
 		Destination: "dest",
 		Pattern:     "**",
@@ -244,19 +246,28 @@ func TestDiscoverFoldersWithModeReportsHeuristicRootFilesAsSplit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mode != SplitHeuristicSplit {
-		t.Fatalf("mode got %q want %q", mode, SplitHeuristicSplit)
+	foundRootFiles := false
+	for _, task := range tasks {
+		if task.Kind == TaskRootFilesOnly {
+			foundRootFiles = true
+		}
+		if task.SplitMode != SplitHeuristicSplit {
+			t.Fatalf("task %#v mode got %q want %q", task, task.SplitMode, SplitHeuristicSplit)
+		}
+	}
+	if !foundRootFiles {
+		t.Fatalf("root-files task missing from %#v", tasks)
 	}
 }
 
-func TestDiscoverFoldersWithModeIgnoresExplicitParallelRsync(t *testing.T) {
+func TestDiscoverTasksIgnoresExplicitParallelRsync(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "source")
 	if err := os.MkdirAll(filepath.Join(source, "a"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	parallel := false
-	_, mode, err := DiscoverFoldersWithMode(Location{
+	tasks, err := DiscoverTasks(Location{
 		Source:        source,
 		Destination:   "dest",
 		Pattern:       "**",
@@ -265,8 +276,8 @@ func TestDiscoverFoldersWithModeIgnoresExplicitParallelRsync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mode != SplitExplicit {
-		t.Fatalf("mode got %q want explicit", mode)
+	if len(tasks) != 1 || tasks[0].Folder != source || tasks[0].SplitMode != SplitExplicit {
+		t.Fatalf("got %#v want one explicit source task", tasks)
 	}
 }
 
