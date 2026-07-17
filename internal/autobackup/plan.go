@@ -69,6 +69,11 @@ type discoveredTask struct {
 }
 
 func BuildPlan(cfg Config, opts Options) (Plan, error) {
+	cfg.applyDefaults()
+	if err := cfg.Validate(); err != nil {
+		return Plan{}, err
+	}
+
 	goos := opts.GOOS
 	if goos == "" {
 		goos = runtime.GOOS

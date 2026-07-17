@@ -67,36 +67,6 @@ func TestResolveConfigPathFallsBackToExecutableDirectory(t *testing.T) {
 	}
 }
 
-func TestLoadConfigRejectsUnderscoreKeys(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.json")
-	err := os.WriteFile(path, []byte(`{
-		"destination": {"host": "host", "username": "pi"},
-		"locations": [{"source": "/tmp/source", "destination": "dest", "parallel_rsync": true}]
-	}`), 0o600)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = LoadConfig(path)
-	if err == nil || !strings.Contains(err.Error(), "parallel_rsync") {
-		t.Fatalf("expected parallel_rsync rejection, got %v", err)
-	}
-}
-
-func TestLoadConfigRejectsUnderscoreExcludeStrings(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.json")
-	err := os.WriteFile(path, []byte(`{
-		"destination": {"host": "host", "username": "pi", "base-path": "/backup"},
-		"locations": [{"source": "/tmp/source", "destination": "dest", "exclude_strings": [".venv"]}]
-	}`), 0o600)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = LoadConfig(path)
-	if err == nil || !strings.Contains(err.Error(), "exclude_strings") {
-		t.Fatalf("expected exclude_strings rejection, got %v", err)
-	}
-}
-
 func TestLoadConfigDefaultsAndDashedKeys(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	err := os.WriteFile(path, []byte(`{

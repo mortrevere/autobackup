@@ -80,9 +80,6 @@ func LoadConfig(path string) (Config, error) {
 		}
 		return Config{}, fmt.Errorf("read config %q: %w", path, err)
 	}
-	if err := rejectUnderscoreKeys(b); err != nil {
-		return Config{}, err
-	}
 
 	var cfg Config
 	if err := json.Unmarshal(b, &cfg); err != nil {
@@ -146,45 +143,4 @@ func (c Config) Validate() error {
 		}
 	}
 	return nil
-}
-
-func rejectUnderscoreKeys(b []byte) error {
-	var root any
-	if err := json.Unmarshal(b, &root); err != nil {
-		return err
-	}
-	unsupported := map[string]string{
-		"parallel_rsync":     "use dashed keys",
-		"base_path":          "use dashed keys",
-		"identity_file":      "use dashed keys",
-		"exclude_prefixes":   "use dashed keys",
-		"exclude_strings":    "use dashed keys",
-		"windows_path_style": "use dashed keys",
-	}
-	var walk func(string, any) error
-	walk = func(path string, v any) error {
-		switch x := v.(type) {
-		case map[string]any:
-			for k, v := range x {
-				if reason, ok := unsupported[k]; ok {
-					return fmt.Errorf("unsupported config key %q at %s; %s", k, path, reason)
-				}
-				next := k
-				if path != "" {
-					next = path + "." + k
-				}
-				if err := walk(next, v); err != nil {
-					return err
-				}
-			}
-		case []any:
-			for i, v := range x {
-				if err := walk(fmt.Sprintf("%s[%d]", path, i), v); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-	return walk("", root)
 }

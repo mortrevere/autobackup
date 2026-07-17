@@ -70,6 +70,44 @@ func TestBuildPlanQuietFromConfigOrOptions(t *testing.T) {
 	}
 }
 
+func TestBuildPlanAppliesConfigDefaults(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "source")
+	if err := os.MkdirAll(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := BuildPlan(Config{
+		Destination: Destination{Host: "host", Username: "pi", BasePath: "/backup"},
+		Tools:       ToolPaths{Rsync: "rsync", SSH: "ssh"},
+		Locations:   []Location{{Source: source, Destination: "dest"}},
+	}, Options{GOOS: "linux", GOARCH: "amd64"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	loc := plan.Config.Locations[0]
+	if loc.Pattern != "**" {
+		t.Fatalf("pattern got %q want **", loc.Pattern)
+	}
+	if loc.Verification != string(VerifyAudit) {
+		t.Fatalf("verification got %q want %q", loc.Verification, VerifyAudit)
+	}
+	if plan.Tasks[0].Location.Verification != string(VerifyAudit) {
+		t.Fatalf("task verification got %q want %q", plan.Tasks[0].Location.Verification, VerifyAudit)
+	}
+}
+
+func TestBuildPlanValidatesConfigBeforePlanning(t *testing.T) {
+	_, err := BuildPlan(Config{
+		Destination: Destination{Host: "host", Username: "pi", BasePath: "/backup"},
+		Tools:       ToolPaths{Rsync: "rsync", SSH: "ssh"},
+		Jobs:        -1,
+		Locations:   []Location{{Source: "missing-source", Destination: "dest"}},
+	}, Options{GOOS: "linux", GOARCH: "amd64"})
+	if err == nil || !strings.Contains(err.Error(), "jobs") {
+		t.Fatalf("got error %v, want jobs validation error", err)
+	}
+}
+
 func TestBuildTaskRsyncArgs(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "source dir")

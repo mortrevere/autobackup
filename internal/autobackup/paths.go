@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -37,7 +36,7 @@ func ResolveTool(configured, name, exePath, goos, goarch string) (string, error)
 	if exePath != "" {
 		if abs, err := filepath.Abs(exePath); err == nil {
 			candidate := filepath.Join(filepath.Dir(abs), "tools", PlatformTag(goos, goarch), toolName)
-			if isExecutable(candidate) {
+			if isExecutable(candidate, goos) {
 				return candidate, nil
 			}
 		}
@@ -52,12 +51,12 @@ var execLookPath = func(file string) (string, error) {
 	return exec.LookPath(file)
 }
 
-func isExecutable(path string) bool {
+func isExecutable(path, goos string) bool {
 	info, err := os.Stat(path)
 	if err != nil || info.IsDir() {
 		return false
 	}
-	if runtime.GOOS == "windows" {
+	if goos == "windows" {
 		return true
 	}
 	return info.Mode()&0111 != 0
